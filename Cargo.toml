@@ -1,7 +1,11 @@
 [package]
 name = "sshx"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
+description = "Terminal-based SSH connection manager with a TUI"
+license = "GPL-3.0-only"
+repository = "https://github.com/JaunatisBlue/sshx"
+readme = "README.md"
 
 [dependencies]
 ratatui = "0.26"
@@ -10,3 +14,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dirs = "5.0"
 anyhow = "1.0"
+unicode-width = "0.1"
+ctrlc = "3.4"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.48", features = ["Win32_Foundation", "Win32_System_Console"] }
