@@ -32,12 +32,19 @@ jobs:
       - name: Get version
         id: get_version
         shell: bash
-        run: echo "VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')" >> "$GITHUB_OUTPUT"
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      # 让二进制里显示的版本号和 tag 一致（v0.4.1 -> 0.4.1）
+      - name: Sync version
+        shell: bash
+        run: |
+          sed -i "s/^version = \"[^\"]*\"/version = \"${{ steps.get_version.outputs.VERSION }}\"/" Cargo.toml
+          grep '^version' Cargo.toml
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
@@ -49,13 +56,17 @@ jobs:
           ARCHIVE_NAME="${{ matrix.archive_template }}"
           ARCHIVE_NAME="${ARCHIVE_NAME//VERSION/$VERSION}"
 
-          cp target/${{ matrix.target }}/release/${{ matrix.bin_name }} .
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "dist/${{ matrix.bin_name }}"
+          cp README.md LICENSE dist/
 
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            tar -acvf "$ARCHIVE_NAME" "${{ matrix.bin_name }}"
+            # Windows 上用 PowerShell 打包，保证产物是合法的 zip
+            powershell -Command "Compress-Archive -Path 'dist/*' -DestinationPath '$ARCHIVE_NAME'"
           else
-            tar -czvf "$ARCHIVE_NAME" "${{ matrix.bin_name }}"
+            tar -czvf "$ARCHIVE_NAME" -C dist "${{ matrix.bin_name }}" README.md LICENSE
           fi
+          ls -l "$ARCHIVE_NAME"
           echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> "$GITHUB_ENV"
 
       - name: Release
@@ -63,3 +74,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ env.ARCHIVE_NAME }}
+          generate_release_notes: true

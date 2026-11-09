@@ -192,7 +192,7 @@ fn render_header(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(block, area);
 
     let right_width = right.width() as u16;
-    let left_text = "SSH connection manager";
+    let left_text = format!("SSH connection manager v{}", env!("CARGO_PKG_VERSION"));
     let left_width = left_text.width() as u16;
 
     // 终端太窄时隐藏左侧说明，避免和右侧信息重叠
