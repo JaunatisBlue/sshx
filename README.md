@@ -24,9 +24,10 @@ store, organize and jump to your servers — built with [ratatui](https://ratatu
 
 1. Install the **OpenSSH Client**: *Settings → System → Optional features → View features →
    OpenSSH Client* (Windows 10 1809+ can also install it from the Microsoft Store).
-2. Download `sshx-windows-amd64-<version>.zip` from the
-   [Releases page](https://github.com/JaunatisBlue/sshx/releases).
-3. Unzip it anywhere and run `sshx.exe`.
+2. Go to the [Releases page](https://github.com/JaunatisBlue/sshx/releases) and download
+   `sshx-windows-amd64-<version>.exe` — it runs as-is, no unzipping needed. The `.zip` bundle
+   (binary + README + LICENSE) is there too if you prefer a folder.
+3. Double-click the `.exe`.
 
 No installation or admin rights needed — configuration lives in `%APPDATA%\sshx`.
 

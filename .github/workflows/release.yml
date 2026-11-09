@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-upload:
+  build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -19,11 +19,11 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             bin_name: sshx
-            archive_template: sshx-linux-amd64.tar.gz
+            base_name: sshx-linux-amd64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             bin_name: sshx.exe
-            archive_template: sshx-windows-amd64.zip
+            base_name: sshx-windows-amd64
 
     steps:
       - name: Checkout code
@@ -49,29 +49,60 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
+      # out/ 里放最终产物，文件名已经带好版本号
       - name: Package
         shell: bash
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          BIN_NAME: ${{ matrix.bin_name }}
+          BASE_NAME: ${{ matrix.base_name }}
+          IS_WINDOWS: ${{ matrix.os == 'windows-latest' }}
         run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-          ARCHIVE_NAME="${{ matrix.archive_template }}"
-          ARCHIVE_NAME="${ARCHIVE_NAME//VERSION/$VERSION}"
+          mkdir -p out stage
 
-          mkdir -p dist
-          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "dist/${{ matrix.bin_name }}"
-          cp README.md LICENSE dist/
+          # 1) 原始可执行文件：Windows 用户下载后直接双击就能用
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "out/${BASE_NAME}-${VERSION}$( [ "$IS_WINDOWS" = "true" ] && echo '.exe' )"
+          chmod +x "out/${BASE_NAME}-${VERSION}"* 2>/dev/null || true
 
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          # 2) 压缩包：包含可执行文件 + README + LICENSE
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "stage/${{ matrix.bin_name }}"
+          cp README.md LICENSE stage/
+
+          if [ "$IS_WINDOWS" = "true" ]; then
             # Windows 上用 PowerShell 打包，保证产物是合法的 zip
-            powershell -Command "Compress-Archive -Path 'dist/*' -DestinationPath '$ARCHIVE_NAME'"
+            powershell -Command "Compress-Archive -Path 'stage/*' -DestinationPath 'out/${BASE_NAME}-${VERSION}.zip'"
           else
-            tar -czvf "$ARCHIVE_NAME" -C dist "${{ matrix.bin_name }}" README.md LICENSE
+            tar -czf "out/${BASE_NAME}-${VERSION}.tar.gz" -C stage "${{ matrix.bin_name }}" README.md LICENSE
           fi
-          ls -l "$ARCHIVE_NAME"
-          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> "$GITHUB_ENV"
 
+          rm -rf stage
+          ls -l out/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sshx-${{ matrix.target }}
+          path: out/
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: out/
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -l out/
+
+      # 一次创建 release，所有平台的文件一起挂上去
       - name: Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ env.ARCHIVE_NAME }}
+          files: out/*
           generate_release_notes: true
